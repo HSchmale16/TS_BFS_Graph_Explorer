@@ -1,0 +1,35 @@
+.start {
+    background-color: green;
+}
+
+.finish {
+    background-color: red;
+}
+
+.wall {
+    background-color: darkgray;
+}
+
+.btn_active {
+    font-weight: bold;
+}
+
+#bfs_explorer {
+    max-width: 80%;
+    margin: 0 auto;
+}
+
+ul#theGridElements {
+    list-style-type: none;
+}
+
+ul#theGridElements li {
+    width: 30px;
+    height: 30px;
+    border: 1px solid black;
+    list-style-type: none;
+}
+
+ul#theGridElements li:hover {
+    background-color: lightblue;
+}
