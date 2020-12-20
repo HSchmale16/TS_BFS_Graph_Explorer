@@ -26,10 +26,15 @@ ul#theGridElements {
 ul#theGridElements li {
     width: 30px;
     height: 30px;
-    border: 1px solid black;
+    border: 2px solid slategray;
     list-style-type: none;
+    border-collapse: collapse
 }
 
+/* make the hovered li red.
+ This shows focus, while keeping everything simple to math about. (No border size changes, and it looks good)
+*/
 ul#theGridElements li:hover {
-    background-color: lightblue;
+    border-color: darkred;
+    box-shadow: inset 5px 5px darkred, inset -5px -5px darkred;
 }
