@@ -25,6 +25,8 @@ const CSS_CUR_FINISH = 'cur_finish';
 const CSS_DISCOVERED = 'discovered';
 const CSS_ACTIVE = 'active';
 const CSS_IN_QUEUE = 'inQueue';
+const CSS_PATH = 'path';
+
 
 var LEFT_MOUSE_BTN_IS_DOWN = false;
 
@@ -45,7 +47,7 @@ enum BfsStatus {
 
 type ElementPredicate = (el: HTMLLIElement) => boolean;
 type ElementMarker = (el: HTMLElement) => null;
-type FindNeighbors = (el: HTMLLIElement) => Array<HTMLLIElement>;
+type FindNeighbors = (el: HTMLLIElement) => IterableIterator<HTMLLIElement>;
 
 
 function isDiscoveredPredicate(el: HTMLElement) {
@@ -60,13 +62,21 @@ function setDiscovered(el: HTMLElement) {
     el.classList.add(CSS_DISCOVERED);
 }
 
-function findNSEWNeighbors(el: HTMLLIElement) : Array<HTMLLIElement> {
+function* findNSEWNeighbors(el: HTMLLIElement) {
     var i = parseInt(el.getAttribute('data-id-num'));
     var sz = bfsController.gridSize;
 
-    return [i + 1, i - 1, i + sz, i - sz]
-        .filter(x => x >= 0 && x <= sz * sz)
-        .map(getLiByIdNum);
+    var id = i + sz;
+    if (id >= 0 && id < (sz * sz))
+        yield getLiByIdNum(id)
+    id = i - sz;
+    if (id >= 0 && id < (sz * sz))
+        yield getLiByIdNum(id)
+    id = i + 1;
+    if (i % sz != (sz - 1))
+        yield getLiByIdNum(id)
+    if (i % sz != 0)
+        yield getLiByIdNum(i - 1);
 }
 
 function setAs(el: HTMLElement, className: string): boolean {
@@ -82,6 +92,10 @@ function getLiByIdNum(num : number) : HTMLLIElement {
 function pickRandomLi(parent: HTMLUListElement): HTMLElement {
     var elems = parent.getElementsByTagName("li");
     return elems.item(Math.floor(Math.random() * elems.length));
+}
+
+function isNotWall(elem : HTMLLIElement) : boolean {
+    return !elem.classList.contains(CSS_WALL);
 }
 
 function randomizeGrid(parentElement: HTMLUListElement) {
@@ -110,6 +124,8 @@ class BfsSearch {
     isDiscovered: ElementPredicate;
     neighborFinder: FindNeighbors;
     status: BfsStatus;
+    parents: Map<number,number> = new Map();
+    searchCompleteTimeToPath : boolean = false;
 
     constructor(
         startElement: HTMLLIElement,
@@ -129,23 +145,36 @@ class BfsSearch {
      * @returns true if done
      */
     step(): boolean {
+        console.log('QUEUE', this.queue);
         if (this.queue.length > 0) {
-            if (this.currentNode != null)
+            this.status = BfsStatus.IN_PROGRESS;
+            if (this.currentNode != null) {
                 this.currentNode.classList.remove(CSS_ACTIVE);
+                this.currentNode.classList.add(CSS_DISCOVERED);
+            }
             this.currentNode = this.queue.shift();
             this.currentNode.classList.remove(CSS_IN_QUEUE);
             this.currentNode.classList.add(CSS_ACTIVE);
 
+            console.log('CURR', this.currentNode);
+
             if (this.isGoal(this.currentNode)) {
+                this.status = BfsStatus.IN_PROGRESS;
                 return true;
             }
+            var myIdNum = parseInt(this.currentNode.getAttribute('data-id-num'));
             for (var elem of this.neighborFinder(this.currentNode)) {
-                if (!this.isDiscovered(elem)) {
+                console.log('TESTING NEIGHBOR', elem)
+                if (!this.isDiscovered(elem) && isNotWall(elem)) {
+                    this.parents[parseInt(elem.getAttribute('data-id-num'))] = myIdNum;
+                    console.log(elem);
                     elem.classList.add(CSS_IN_QUEUE);
-                    this.queue.push(elem);
+                    console.log(this.queue.push(elem));
                 }
             }
             return false;
+        } else {
+            // draw the path one step at a time.
         }
         return true;
     }
@@ -175,6 +204,7 @@ class RunButtonManager {
 
     setupBfsSearchIfNeeded() {
         if (this.bfsSearch == null || this.bfsSearch.status != BfsStatus.IN_PROGRESS) {
+            console.log("RESET BFS");
             this.bfsSearch = new BfsSearch(
                 <HTMLLIElement>document.getElementsByClassName(CSS_START_POINT)[0],
                 isFinishPredicate,
@@ -237,6 +267,7 @@ class BfsExplorerController {
         this.updateGridSize(this.gridSizeInput.valueAsNumber);
         this.updateGridBtn.onclick = (ev: MouseEvent) => {
             this.updateGridSize(this.gridSizeInput.valueAsNumber);
+            this.runMgr.bfsSearch = null; // clear the bfs
         };
 
         // set up drawing buttons
@@ -302,7 +333,6 @@ class BfsExplorerController {
     }
 
     handleGridElementClick = (ev: MouseEvent) => {
-        console.log(ev, this.stateOfCursor);
         if (ev.type == "click" || LEFT_MOUSE_BTN_IS_DOWN) {
             switch (this.stateOfCursor) {
                 case CursorState.DRAW_WALL:

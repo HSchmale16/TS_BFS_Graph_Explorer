@@ -1,7 +1,8 @@
 :root {
-    --explored: lightgreen;
+    --path: lightgreen;
     --active: gold;
     --inQueue: lightblue;
+    --discovered: darkblue;
 }
 
 
@@ -28,12 +29,12 @@ span.active {
     padding-right: 3px;
 }
 
-li.explored {
-    box-shadow: inset 7px 7px var(--explored), inset -7px 7px var(--explored);
+li.path {
+    box-shadow: inset 7px 7px var(--path), inset -7px 7px var(--path);
 }
 
-span.explored {
-    color: var(--explored);
+span.path {
+    color: var(--path);
     background-color: black;
     padding-left: 3px;
     padding-right: 3px;
@@ -46,6 +47,17 @@ li.inQueue {
 span.inQueue {
     color: var(--inQueue);
     background-color: black;
+    padding-left: 3px;
+    padding-right: 3px;
+}
+
+li.discovered {
+    box-shadow: inset 7px 7px var(--discovered), inset -7px 7px var(--discovered);
+}
+
+span.discovered {
+    color: var(--discovered);
+    background-color: lightgrey;
     padding-left: 3px;
     padding-right: 3px;
 }
