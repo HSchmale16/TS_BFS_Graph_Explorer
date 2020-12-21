@@ -42,7 +42,8 @@ enum BfsStatus {
     STARTING,
     IN_PROGRESS,
     FOUND_IT,
-    FAILED
+    FAILED,
+    COMPLETE
 }
 
 type ElementPredicate = (el: HTMLLIElement) => boolean;
@@ -160,6 +161,7 @@ class BfsSearch {
 
             if (this.isGoal(this.currentNode)) {
                 this.status = BfsStatus.IN_PROGRESS;
+                this.searchCompleteTimeToPath = true;
                 return true;
             }
             var myIdNum = parseInt(this.currentNode.getAttribute('data-id-num'));
@@ -175,6 +177,12 @@ class BfsSearch {
             return false;
         } else {
             // draw the path one step at a time.
+            if (this.searchCompleteTimeToPath && this.status != BfsStatus.COMPLETE) {
+
+            } else {
+                alert("Done")
+            }
+
         }
         return true;
     }
@@ -184,6 +192,7 @@ class RunButtonManager {
     runBtn: HTMLButtonElement;
     stepBtn: HTMLButtonElement;
     bfsSearch: BfsSearch;
+    intervalId : number = -1;
 
     constructor(
         runBtn: HTMLButtonElement,
@@ -191,6 +200,21 @@ class RunButtonManager {
     ) {
         this.bfsSearch = null;
         this.runBtn = runBtn;
+        this.runBtn.onclick = (ev : MouseEvent) {
+            if (this.intervalId > 0) {
+                // clear it
+                this.runBtn.innerHTML = "Run";
+                clearInterval(this.intervalId);
+                this.intervalId = -1;
+            } else {
+                // start the interval
+                this.intervalId = setInterval(() => {
+                    console.log(this);
+                    this.step()
+                }, 100);
+                this.runBtn.innerHTML = "Pause";
+            }
+        }
 
         this.stepBtn = stepBtn;
         this.stepBtn.onclick = () => this.step();
