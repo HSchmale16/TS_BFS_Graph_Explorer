@@ -30,7 +30,7 @@ span.active {
 }
 
 li.path {
-    box-shadow: inset 7px 7px var(--path), inset -7px 7px var(--path);
+    box-shadow: inset 10px 10px var(--path), inset -10px -10px var(--path) !important;
 }
 
 span.path {
@@ -90,4 +90,8 @@ ul#theGridElements li {
 ul#theGridElements li:hover {
     border-color: darkred;
     box-shadow: inset 5px 5px darkred, inset -5px -5px darkred;
+}
+
+button {
+    font-size: 14pt;
 }

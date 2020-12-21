@@ -9,6 +9,7 @@
 
 // width = 20 + 1px border = 22
 const GRID_BOX_SIZE = 34;
+const MS_BETWEEN_UPDATES = 75;
 var bfsController : BfsExplorerController = null;
 
 // various css classes for the types of things on the grid
@@ -50,6 +51,18 @@ type ElementPredicate = (el: HTMLLIElement) => boolean;
 type ElementMarker = (el: HTMLElement) => null;
 type FindNeighbors = (el: HTMLLIElement) => IterableIterator<HTMLLIElement>;
 
+function clearClass(className : string, tagName : string) {
+    for (var elem of document.querySelectorAll(`${tagName}.${className}`)) {
+            elem.classList.remove(className);
+    }
+}
+
+function clearInProgressClasses() {
+    clearClass(CSS_ACTIVE, "li");
+    clearClass(CSS_IN_QUEUE, "li");
+    clearClass(CSS_DISCOVERED, "li");
+    clearClass(CSS_PATH, "li");
+}
 
 function isDiscoveredPredicate(el: HTMLElement) {
     return el.classList.contains(CSS_DISCOVERED) || el.classList.contains(CSS_IN_QUEUE);
@@ -147,7 +160,7 @@ class BfsSearch {
      */
     step(): boolean {
         console.log('QUEUE', this.queue);
-        if (this.queue.length > 0) {
+        if (this.queue.length > 0 && !this.searchCompleteTimeToPath) {
             this.status = BfsStatus.IN_PROGRESS;
             if (this.currentNode != null) {
                 this.currentNode.classList.remove(CSS_ACTIVE);
@@ -178,7 +191,10 @@ class BfsSearch {
         } else {
             // draw the path one step at a time.
             if (this.searchCompleteTimeToPath && this.status != BfsStatus.COMPLETE) {
-
+                var id = parseInt(this.currentNode.getAttribute('data-id-num'));
+                console.log(id);
+                this.currentNode.classList.add(CSS_PATH);
+                this.currentNode = getLiByIdNum(this.parents[id]);
             } else {
                 alert("Done")
             }
@@ -191,33 +207,50 @@ class BfsSearch {
 class RunButtonManager {
     runBtn: HTMLButtonElement;
     stepBtn: HTMLButtonElement;
+    resetBtn : HTMLButtonElement;
     bfsSearch: BfsSearch;
     intervalId : number = -1;
 
     constructor(
         runBtn: HTMLButtonElement,
-        stepBtn: HTMLButtonElement
+        stepBtn: HTMLButtonElement,
+        resetButton : HTMLButtonElement
     ) {
         this.bfsSearch = null;
         this.runBtn = runBtn;
-        this.runBtn.onclick = (ev : MouseEvent) {
+        this.runBtn.onclick = (ev : MouseEvent) => {
             if (this.intervalId > 0) {
-                // clear it
-                this.runBtn.innerHTML = "Run";
-                clearInterval(this.intervalId);
-                this.intervalId = -1;
+                this.pause();
             } else {
                 // start the interval
                 this.intervalId = setInterval(() => {
                     console.log(this);
-                    this.step()
-                }, 100);
+                    try {
+                        this.step()
+                    } catch {
+                        this.runBtn.click();
+                    }
+                }, MS_BETWEEN_UPDATES);
                 this.runBtn.innerHTML = "Pause";
             }
         }
 
         this.stepBtn = stepBtn;
         this.stepBtn.onclick = () => this.step();
+
+        this.resetBtn = resetButton;
+        this.resetBtn.onclick = () => {
+            this.pause();
+            clearInProgressClasses();
+            this.bfsSearch = null;
+        }
+    }
+
+    pause() {
+        // clear it
+        this.runBtn.innerHTML = "Run";
+        clearInterval(this.intervalId);
+        this.intervalId = -1;
     }
 
     step() {
@@ -271,7 +304,8 @@ class BfsExplorerController {
         placeStartBtn: HTMLButtonElement,
         placeFinishBtn: HTMLButtonElement,
         runBtn: HTMLButtonElement,
-        stepBtn: HTMLButtonElement
+        stepBtn: HTMLButtonElement,
+        resetBtn : HTMLButtonElement
     ) {
         // Set attributes
         this.gridSizeInput = gridSizeInput;
@@ -282,7 +316,7 @@ class BfsExplorerController {
         this.placeStartBtn = placeStartBtn;
         this.placeFinishBtn = placeFinishBtn;
 
-        this.runMgr = new RunButtonManager(runBtn, stepBtn);
+        this.runMgr = new RunButtonManager(runBtn, stepBtn, resetBtn);
 
         // Set fields
         this.stateOfCursor = CursorState.NO_EFFECT;
@@ -410,10 +444,11 @@ window.onload = () => {
     const placeFinishBtn = <HTMLButtonElement>document.getElementById("placeFinishBtn")
     const runBtn = <HTMLButtonElement>document.getElementById("runAtFullSpeed");
     const stepBtn = <HTMLButtonElement>document.getElementById("step");
+    const resetBtn = <HTMLButtonElement>document.getElementById("resetSearch")
 
     bfsController = new BfsExplorerController(
         gridSizeInput, updateGridBtn, theGridElements, drawWallBtn, clearWallBtn,
-        placeStartBtn, placeFinishBtn, runBtn, stepBtn
+        placeStartBtn, placeFinishBtn, runBtn, stepBtn, resetBtn
     );
 
     document.addEventListener('mousedown', (ev) => {
