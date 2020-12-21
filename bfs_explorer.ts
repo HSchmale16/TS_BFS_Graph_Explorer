@@ -9,6 +9,7 @@
 
 // width = 20 + 1px border = 22
 const GRID_BOX_SIZE = 34;
+var bfsController : BfsExplorerController = null;
 
 // various css classes for the types of things on the grid
 const CSS_START_POINT = 'start';
@@ -21,6 +22,10 @@ const CSS_CUR_DRAW = 'cur_draw';
 const CSS_CUR_START = 'cur_start';
 const CSS_CUR_FINISH = 'cur_finish';
 
+const CSS_DISCOVERED = 'discovered';
+const CSS_ACTIVE = 'active';
+const CSS_IN_QUEUE = 'inQueue';
+
 var LEFT_MOUSE_BTN_IS_DOWN = false;
 
 enum CursorState {
@@ -31,33 +36,188 @@ enum CursorState {
     SET_FINISH_POINT
 }
 
+enum BfsStatus {
+    STARTING,
+    IN_PROGRESS,
+    FOUND_IT,
+    FAILED
+}
 
-class BfsExplorer {
-    // The grid size input
-    gridSizeInput : HTMLInputElement;
+type ElementPredicate = (el: HTMLLIElement) => boolean;
+type ElementMarker = (el: HTMLElement) => null;
+type FindNeighbors = (el: HTMLLIElement) => Array<HTMLLIElement>;
 
-    // button to reset grid and update
-    updateGridBtn : HTMLButtonElement;
 
-    // The list element containing everything
-    theGridElementParent : HTMLUListElement;
-    theGrid = [HTMLLIElement];
-    drawWallBtn : HTMLButtonElement;
-    clearWallBtn : HTMLButtonElement;
-    placeStartBtn : HTMLButtonElement;
-    placeFinishBtn : HTMLButtonElement;
-    gridSize : number;
+function isDiscoveredPredicate(el: HTMLElement) {
+    return el.classList.contains(CSS_DISCOVERED) || el.classList.contains(CSS_IN_QUEUE);
+}
 
-    stateOfCursor : CursorState;
+function isFinishPredicate(el: HTMLLIElement) {
+    return el.classList.contains(CSS_FINISH_POINT);
+}
+
+function setDiscovered(el: HTMLElement) {
+    el.classList.add(CSS_DISCOVERED);
+}
+
+function findNSEWNeighbors(el: HTMLLIElement) : Array<HTMLLIElement> {
+    var i = parseInt(el.getAttribute('data-id-num'));
+    var sz = bfsController.gridSize;
+
+    return [i + 1, i - 1, i + sz, i - sz]
+        .filter(x => x >= 0 && x <= sz * sz)
+        .map(getLiByIdNum);
+}
+
+function setAs(el: HTMLElement, className: string): boolean {
+    if (el.classList.length > 0) return true;
+    el.classList.add(className);
+    return false;
+}
+
+function getLiByIdNum(num : number) : HTMLLIElement {
+    return document.querySelector(`[data-id-num="${num}"]`);
+}
+
+function pickRandomLi(parent: HTMLUListElement): HTMLElement {
+    var elems = parent.getElementsByTagName("li");
+    return elems.item(Math.floor(Math.random() * elems.length));
+}
+
+function randomizeGrid(parentElement: HTMLUListElement) {
+    // add some walls
+    for (var i = 0; i < 70; ++i) {
+        var elem = null;
+        do {
+            elem = pickRandomLi(parentElement);
+        } while (setAs(elem, CSS_WALL));
+    }
+    // add a start point
+    var elem = null;
+    do {
+        elem = pickRandomLi(parentElement);
+    } while (setAs(elem, CSS_START_POINT));
+    // add an end point
+    do {
+        elem = pickRandomLi(parentElement);
+    } while (setAs(elem, CSS_FINISH_POINT));
+}
+
+class BfsSearch {
+    currentNode: HTMLLIElement;
+    queue: Array<HTMLLIElement>
+    isGoal: ElementPredicate;
+    isDiscovered: ElementPredicate;
+    neighborFinder: FindNeighbors;
+    status: BfsStatus;
 
     constructor(
-        gridSizeInput : HTMLInputElement,
-        updateGridBtn : HTMLButtonElement,
-        theGridElements : HTMLUListElement,
-        drawWallBtn : HTMLButtonElement,
-        clearWallBtn : HTMLButtonElement,
-        placeStartBtn : HTMLButtonElement,
-        placeFinishBtn : HTMLButtonElement
+        startElement: HTMLLIElement,
+        isGoal: ElementPredicate,
+        isDiscovered: ElementPredicate,
+        neighborFinder: FindNeighbors
+    ) {
+        startElement.classList.add(CSS_ACTIVE);
+        this.queue = new Array(startElement);
+        this.isGoal = isGoal;
+        this.isDiscovered = isDiscovered;
+        this.neighborFinder = neighborFinder;
+        this.status = BfsStatus.STARTING;
+    }
+
+    /**
+     * @returns true if done
+     */
+    step(): boolean {
+        if (this.queue.length > 0) {
+            if (this.currentNode != null)
+                this.currentNode.classList.remove(CSS_ACTIVE);
+            this.currentNode = this.queue.shift();
+            this.currentNode.classList.remove(CSS_IN_QUEUE);
+            this.currentNode.classList.add(CSS_ACTIVE);
+
+            if (this.isGoal(this.currentNode)) {
+                return true;
+            }
+            for (var elem of this.neighborFinder(this.currentNode)) {
+                if (!this.isDiscovered(elem)) {
+                    elem.classList.add(CSS_IN_QUEUE);
+                    this.queue.push(elem);
+                }
+            }
+            return false;
+        }
+        return true;
+    }
+}
+
+class RunButtonManager {
+    runBtn: HTMLButtonElement;
+    stepBtn: HTMLButtonElement;
+    bfsSearch: BfsSearch;
+
+    constructor(
+        runBtn: HTMLButtonElement,
+        stepBtn: HTMLButtonElement
+    ) {
+        this.bfsSearch = null;
+        this.runBtn = runBtn;
+
+        this.stepBtn = stepBtn;
+        this.stepBtn.onclick = () => this.step();
+    }
+
+    step() {
+        console.log("doing a step");
+        this.setupBfsSearchIfNeeded();
+        this.bfsSearch.step();
+    }
+
+    setupBfsSearchIfNeeded() {
+        if (this.bfsSearch == null || this.bfsSearch.status != BfsStatus.IN_PROGRESS) {
+            this.bfsSearch = new BfsSearch(
+                <HTMLLIElement>document.getElementsByClassName(CSS_START_POINT)[0],
+                isFinishPredicate,
+                isDiscoveredPredicate,
+                findNSEWNeighbors
+            );
+        }
+
+    }
+}
+
+// The UI Controller thing
+class BfsExplorerController {
+    // The grid size input
+    gridSizeInput: HTMLInputElement;
+
+    // button to reset grid and update
+    updateGridBtn: HTMLButtonElement;
+
+    // The list element containing everything
+    theGridElementParent: HTMLUListElement;
+    theGrid = [HTMLLIElement];
+    drawWallBtn: HTMLButtonElement;
+    clearWallBtn: HTMLButtonElement;
+    placeStartBtn: HTMLButtonElement;
+    placeFinishBtn: HTMLButtonElement;
+
+    // Fields
+    gridSize: number;
+    stateOfCursor: CursorState;
+    search: BfsSearch
+    runMgr: RunButtonManager;
+
+    constructor(
+        gridSizeInput: HTMLInputElement,
+        updateGridBtn: HTMLButtonElement,
+        theGridElements: HTMLUListElement,
+        drawWallBtn: HTMLButtonElement,
+        clearWallBtn: HTMLButtonElement,
+        placeStartBtn: HTMLButtonElement,
+        placeFinishBtn: HTMLButtonElement,
+        runBtn: HTMLButtonElement,
+        stepBtn: HTMLButtonElement
     ) {
         // Set attributes
         this.gridSizeInput = gridSizeInput;
@@ -65,48 +225,58 @@ class BfsExplorer {
         this.theGridElementParent = theGridElements;
         this.drawWallBtn = drawWallBtn;
         this.clearWallBtn = clearWallBtn;
-        this.placeStartBtn = placeStartBtn,
+        this.placeStartBtn = placeStartBtn;
         this.placeFinishBtn = placeFinishBtn;
+
+        this.runMgr = new RunButtonManager(runBtn, stepBtn);
 
         // Set fields
         this.stateOfCursor = CursorState.NO_EFFECT;
 
         // Perform initialization on elements
         this.updateGridSize(this.gridSizeInput.valueAsNumber);
-        this.updateGridBtn.onclick = (ev : MouseEvent) => {
+        this.updateGridBtn.onclick = (ev: MouseEvent) => {
             this.updateGridSize(this.gridSizeInput.valueAsNumber);
         };
-        
+
         // set up drawing buttons
         this.drawWallBtn.onclick = this.setDrawWall;
         this.clearWallBtn.onclick = this.setEraseWall;
         this.placeStartBtn.onclick = this.setStartPoint;
         this.placeFinishBtn.onclick = this.setFinishPoint;
+
+
+        // Just freaking do it. I'll come back to it.
+        document.getElementById("randomize").onclick = (ev: MouseEvent) => {
+            this.updateGridSize(this.gridSizeInput.valueAsNumber);
+            randomizeGrid(this.theGridElementParent);
+        }
+        randomizeGrid(this.theGridElementParent);
     }
 
-    setDrawWall = (ev : MouseEvent) => {
+    setDrawWall = (ev: MouseEvent) => {
         if (this.clearDrawingForActive(this.drawWallBtn)) {
             this.stateOfCursor = CursorState.DRAW_WALL;
             this.theGridElementParent.classList.add(CSS_CUR_DRAW);
         }
-        
+
     }
 
-    setEraseWall = (ev : MouseEvent) => {
-        if(this.clearDrawingForActive(this.clearWallBtn)) {
+    setEraseWall = (ev: MouseEvent) => {
+        if (this.clearDrawingForActive(this.clearWallBtn)) {
             this.stateOfCursor = CursorState.RESET_ATTRIBUTES;
             this.theGridElementParent.classList.add(CSS_CUR_ERASE)
         }
     }
 
-    setStartPoint = (ev : MouseEvent) => {
-        if (this.clearDrawingForActive(this.placeStartBtn) ) {
+    setStartPoint = (ev: MouseEvent) => {
+        if (this.clearDrawingForActive(this.placeStartBtn)) {
             this.stateOfCursor = CursorState.SET_START;
             this.theGridElementParent.classList.add(CSS_CUR_START);
         }
     }
 
-    setFinishPoint = (ev : MouseEvent) => {
+    setFinishPoint = (ev: MouseEvent) => {
         if (this.clearDrawingForActive(this.placeFinishBtn)) {
             this.stateOfCursor = CursorState.SET_FINISH_POINT;
             this.theGridElementParent.classList.add(CSS_CUR_FINISH);
@@ -116,7 +286,7 @@ class BfsExplorer {
     /**
      * @returns true if it was already active clearing the cursor state
      */
-    clearDrawingForActive(toActive : HTMLButtonElement) {
+    clearDrawingForActive(toActive: HTMLButtonElement) {
         this.theGridElementParent.className = "";
         if (toActive.classList.contains(CSS_BTN_ACTIVE)) {
             toActive.classList.remove(CSS_BTN_ACTIVE);
@@ -124,39 +294,39 @@ class BfsExplorer {
             this.theGridElementParent.className = "";
             return false;
         }
-        for(var btn of [this.drawWallBtn, this.clearWallBtn, this.placeStartBtn, this.placeFinishBtn]) {
+        for (var btn of [this.drawWallBtn, this.clearWallBtn, this.placeStartBtn, this.placeFinishBtn]) {
             btn.className = "";
         }
         toActive.classList.add(CSS_BTN_ACTIVE);
         return true;
     }
 
-    handleGridElementClick = (ev : MouseEvent) => {
+    handleGridElementClick = (ev: MouseEvent) => {
         console.log(ev, this.stateOfCursor);
         if (ev.type == "click" || LEFT_MOUSE_BTN_IS_DOWN) {
-            switch(this.stateOfCursor) {
-            case CursorState.DRAW_WALL:
-                (<HTMLElement>ev.target).className = CSS_WALL;
-                break;
-            case CursorState.RESET_ATTRIBUTES:
-                (<HTMLElement>ev.target).className = "";
-                break;
-            case CursorState.SET_START:
-                var elems = document.getElementsByClassName(CSS_START_POINT);
-                for (var i = 0; i < elems.length; ++i) {
-                    elems.item(i).className = "";
-                }
-                (<HTMLElement>ev.target).className = CSS_START_POINT;
-                break;
-            case CursorState.SET_FINISH_POINT:
-                (<HTMLElement>ev.target).className = CSS_FINISH_POINT;
-                break;
-            default:
+            switch (this.stateOfCursor) {
+                case CursorState.DRAW_WALL:
+                    (<HTMLElement>ev.target).className = CSS_WALL;
+                    break;
+                case CursorState.RESET_ATTRIBUTES:
+                    (<HTMLElement>ev.target).className = "";
+                    break;
+                case CursorState.SET_START:
+                    var elems = document.getElementsByClassName(CSS_START_POINT);
+                    for (var i = 0; i < elems.length; ++i) {
+                        elems.item(i).className = "";
+                    }
+                    (<HTMLElement>ev.target).className = CSS_START_POINT;
+                    break;
+                case CursorState.SET_FINISH_POINT:
+                    (<HTMLElement>ev.target).className = CSS_FINISH_POINT;
+                    break;
+                default:
             }
         }
     }
 
-    updateGridSize(size : number) {
+    updateGridSize(size: number) {
         this.theGridElementParent.innerHTML = "";
         this.theGridElementParent.style.columnCount = size.toString();
         this.gridSize = size;
@@ -167,7 +337,8 @@ class BfsExplorer {
 
 
         for (var i = 0; i < elemCount; ++i) {
-            var li : HTMLLIElement = document.createElement("li");
+            var li: HTMLLIElement = document.createElement("li");
+            li.setAttribute("data-id-num", i.toString());
             li.addEventListener('mouseenter', this.handleGridElementClick);
             li.addEventListener('click', this.handleGridElementClick);
             this.theGridElementParent.appendChild(li);
@@ -183,10 +354,12 @@ window.onload = () => {
     const clearWallBtn = <HTMLButtonElement>document.getElementById("clearWallBtn");
     const placeStartBtn = <HTMLButtonElement>document.getElementById("placeStartBtn");
     const placeFinishBtn = <HTMLButtonElement>document.getElementById("placeFinishBtn")
+    const runBtn = <HTMLButtonElement>document.getElementById("runAtFullSpeed");
+    const stepBtn = <HTMLButtonElement>document.getElementById("step");
 
-    const bfs = new BfsExplorer(
+    bfsController = new BfsExplorerController(
         gridSizeInput, updateGridBtn, theGridElements, drawWallBtn, clearWallBtn,
-        placeStartBtn, placeFinishBtn
+        placeStartBtn, placeFinishBtn, runBtn, stepBtn
     );
 
     document.addEventListener('mousedown', (ev) => {

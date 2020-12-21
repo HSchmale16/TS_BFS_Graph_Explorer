@@ -1,3 +1,10 @@
+:root {
+    --explored: lightgreen;
+    --active: gold;
+    --inQueue: lightblue;
+}
+
+
 .start {
     background-color: green;
 }
@@ -10,6 +17,40 @@
     background-color: darkgray;
 }
 
+li.active {
+    box-shadow: inset 7px 7px var(--active), inset -7px 7px var(--active);
+}
+
+span.active {
+    color: var(--active);
+    background-color: black;
+    padding-left: 3px;
+    padding-right: 3px;
+}
+
+li.explored {
+    box-shadow: inset 7px 7px var(--explored), inset -7px 7px var(--explored);
+}
+
+span.explored {
+    color: var(--explored);
+    background-color: black;
+    padding-left: 3px;
+    padding-right: 3px;
+}
+
+li.inQueue {
+    box-shadow: inset 7px 7px var(--inQueue), inset -7px 7px var(--inQueue);
+}
+
+span.inQueue {
+    color: var(--inQueue);
+    background-color: black;
+    padding-left: 3px;
+    padding-right: 3px;
+}
+
+/* global stuff */
 .btn_active {
     font-weight: bold;
 }
