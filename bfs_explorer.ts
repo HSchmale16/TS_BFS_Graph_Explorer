@@ -283,7 +283,7 @@ class BfsExplorerController {
 
     // The list element containing everything
     theGridElementParent: HTMLUListElement;
-    theGrid = [HTMLLIElement];
+    theGrid : [HTMLLIElement];
     drawWallBtn: HTMLButtonElement;
     clearWallBtn: HTMLButtonElement;
     placeStartBtn: HTMLButtonElement;
