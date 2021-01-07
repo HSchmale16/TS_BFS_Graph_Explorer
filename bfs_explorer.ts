@@ -114,7 +114,9 @@ function isNotWall(elem : HTMLLIElement) : boolean {
 
 function randomizeGrid(parentElement: HTMLUListElement) {
     // add some walls
-    for (var i = 0; i < 70; ++i) {
+    const FILL_FACTOR = 0.5;
+
+    for (var i = 0; i < parentElement.childElementCount * FILL_FACTOR; ++i) {
         var elem = null;
         do {
             elem = pickRandomLi(parentElement);
