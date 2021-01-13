@@ -114,7 +114,7 @@ function isNotWall(elem : HTMLLIElement) : boolean {
 
 function randomizeGrid(parentElement: HTMLUListElement) {
     // add some walls
-    const FILL_FACTOR = 0.5;
+    const FILL_FACTOR = 0.30;
 
     for (var i = 0; i < parentElement.childElementCount * FILL_FACTOR; ++i) {
         var elem = null;
@@ -341,6 +341,7 @@ class BfsExplorerController {
         document.getElementById("randomize").onclick = (ev: MouseEvent) => {
             this.updateGridSize(this.gridSizeInput.valueAsNumber);
             randomizeGrid(this.theGridElementParent);
+            this.runMgr.bfsSearch = null;    
         }
         randomizeGrid(this.theGridElementParent);
     }
@@ -350,7 +351,6 @@ class BfsExplorerController {
             this.stateOfCursor = CursorState.DRAW_WALL;
             this.theGridElementParent.classList.add(CSS_CUR_DRAW);
         }
-
     }
 
     setEraseWall = (ev: MouseEvent) => {
